@@ -20,9 +20,13 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+type Grant struct {
+	Privileges string `json:"privileges"`
+	On         string `json:"on"`
+}
+
 // MySQLUserSpec defines the desired state of MySQLUser
 type MySQLUserSpec struct {
-
 	// MySQL (CRD) name to reference to, which decides the destination MySQL server
 	MysqlName string `json:"mysqlName"`
 
@@ -31,11 +35,13 @@ type MySQLUserSpec struct {
 
 	// MySQL hostname for MySQL account
 	Host string `json:"host"`
+
+	// MySQL grants/privileges for the user
+	Grants []Grant `json:"grants,omitempty"`
 }
 
 // MySQLUserStatus defines the observed state of MySQLUser
 type MySQLUserStatus struct {
-
 	// +patchMergeKey=type
 	// +patchStrategy=merge
 	// +listType=map

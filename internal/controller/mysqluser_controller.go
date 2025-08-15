@@ -88,7 +88,7 @@ func (r *MySQLUserReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 
 	// Fetch MySQL
 	mysql := &mysqlv1alpha1.MySQL{}
-	var mysqlNamespacedName = client.ObjectKey{Namespace: req.Namespace, Name: mysqlUser.Spec.MysqlName}
+	mysqlNamespacedName := client.ObjectKey{Namespace: req.Namespace, Name: mysqlUser.Spec.MysqlName}
 	if err := r.Get(ctx, mysqlNamespacedName, mysql); err != nil {
 		log.Error(err, "[FetchMySQL] Failed")
 		mysqlUser.Status.Phase = mysqlUserPhaseNotReady
@@ -104,11 +104,11 @@ func (r *MySQLUserReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 	if !r.ifOwnerReferencesContains(mysqlUser.OwnerReferences, mysql) {
 		err := controllerutil.SetControllerReference(mysql, mysqlUser, r.Scheme)
 		if err != nil {
-			return ctrl.Result{}, err //requeue
+			return ctrl.Result{}, err // requeue
 		}
 		err = r.Update(ctx, mysqlUser)
 		if err != nil {
-			return ctrl.Result{}, err //requeue
+			return ctrl.Result{}, err // requeue
 		}
 	}
 
@@ -216,6 +216,26 @@ func (r *MySQLUserReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 		return ctrl.Result{RequeueAfter: time.Second}, nil // requeue after 1 second
 	}
 
+	// Grant privileges if specified
+	if len(mysqlUser.Spec.Grants) > 0 {
+		for _, grant := range mysqlUser.Spec.Grants {
+			grantSQL := fmt.Sprintf("GRANT %s ON %s TO '%s'@'%s'", grant.Privileges, grant.On, mysqlUserName, mysqlUser.Spec.Host)
+			_, err = mysqlClient.ExecContext(ctx, grantSQL)
+			if err != nil {
+				log.Error(err, "[MySQL] Failed to grant privileges", "mysqlName", mysqlName, "mysqlUserName", mysqlUserName, "privileges", grant.Privileges, "on", grant.On)
+				mysqlUser.Status.Phase = mysqlUserPhaseNotReady
+				mysqlUser.Status.Reason = "Failed to grant privileges"
+				mysqlUser.Status.MySQLUserCreated = false
+				if serr := r.Status().Update(ctx, mysqlUser); serr != nil {
+					log.Error(serr, "Failed to update mysqluser status", "mysqlUser", mysqlUser.Name)
+					return ctrl.Result{RequeueAfter: time.Second}, nil
+				}
+				return ctrl.Result{RequeueAfter: time.Second}, nil
+			}
+			log.Info("[MySQL] Granted privileges", "privileges", grant.Privileges, "on", grant.On, "user", mysqlUserName)
+		}
+	}
+
 	log.Info("[MySQL] Created or updated", "name", mysqlUserName, "mysqlUser.Namespace", mysqlUser.Namespace)
 	metrics.MysqlUserCreatedTotal.Increment() // TODO: increment only when a user is created
 	mysqlUser.Status.Phase = mysqlUserPhaseNotReady
@@ -253,7 +273,22 @@ func (r *MySQLUserReconciler) SetupWithManager(mgr ctrl.Manager) error {
 
 // finalizeMySQLUser drops MySQL user
 func (r *MySQLUserReconciler) finalizeMySQLUser(ctx context.Context, mysqlClient *sql.DB, mysqlUser *mysqlv1alpha1.MySQLUser) error {
+	log := log.FromContext(ctx).WithName("finalizeMySQLUser")
+
 	if mysqlUser.Status.MySQLUserCreated {
+		// Revoke all grants first if any were specified
+		if len(mysqlUser.Spec.Grants) > 0 {
+			for _, grant := range mysqlUser.Spec.Grants {
+				revokeSQL := fmt.Sprintf("REVOKE %s ON %s FROM '%s'@'%s'", grant.Privileges, grant.On, mysqlUser.Name, mysqlUser.Spec.Host)
+				_, err := mysqlClient.ExecContext(ctx, revokeSQL)
+				if err != nil {
+					log.Error(err, "[MySQL] Failed to revoke privileges during cleanup", "privileges", grant.Privileges, "on", grant.On, "user", mysqlUser.Name)
+				} else {
+					log.Info("[MySQL] Revoked privileges", "privileges", grant.Privileges, "on", grant.On, "user", mysqlUser.Name)
+				}
+			}
+		}
+
 		_, err := mysqlClient.ExecContext(ctx, fmt.Sprintf("DROP USER IF EXISTS '%s'@'%s'", mysqlUser.Name, mysqlUser.Spec.Host))
 		if err != nil {
 			return err

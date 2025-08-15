@@ -56,6 +56,19 @@ spec:
           spec:
             description: MySQLUserSpec defines the desired state of MySQLUser
             properties:
+              grants:
+                description: MySQL grants/privileges for the user
+                items:
+                  properties:
+                    "on":
+                      type: string
+                    privileges:
+                      type: string
+                  required:
+                  - "on"
+                  - privileges
+                  type: object
+                type: array
               host:
                 default: '%'
                 description: MySQL hostname for MySQL account
