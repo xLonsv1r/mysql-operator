@@ -80,6 +80,23 @@ Reduce human operations:
       host: '%'
     ```
 
+    `mysqluser-with-grants.yaml`: MySQL user with specific grants
+
+    ```yaml
+    apiVersion: mysql.nakamasato.com/v1alpha1
+    kind: MySQLUser
+    metadata:
+      name: sample-user-with-grants
+    spec:
+      mysqlName: mysql-sample
+      host: '%'
+      grants:
+        - privileges: "SELECT, INSERT, UPDATE"
+          on: "sample_db.*"
+        - privileges: "SELECT"
+          on: "other_db.users"
+    ```
+
     `mysqldb.yaml`: MySQL database
 
     ```yaml

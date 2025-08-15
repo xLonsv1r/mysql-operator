@@ -71,7 +71,7 @@ This is a Kubernetes operator built with [operator-sdk](https://sdk.operatorfram
 ### Custom Resources
 
 1. **MySQL**: Defines the connection to a MySQL server (host, port, admin credentials)
-2. **MySQLUser**: Defines a MySQL user for a specific MySQL instance
+2. **MySQLUser**: Defines a MySQL user for a specific MySQL instance with optional grants/privileges
 3. **MySQLDB**: Defines a MySQL database for a specific MySQL instance, with optional schema migration
 
 ### Controllers

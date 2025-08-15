@@ -14,7 +14,7 @@ Reduce human operations:
 
 ## Custom Resources
 * `MySQL` - MySQL cluster or server.
-* `MySQLUser` - MySQL user.
+* `MySQLUser` - MySQL user with optional grants/privileges.
 * `MySQLDB` - MySQL database.
 
 ## Contents
@@ -90,6 +90,23 @@ Reduce human operations:
       host: '%'
     ```
 
+    `mysqluser-with-grants.yaml`: MySQL user with specific grants
+
+    ```yaml
+    apiVersion: mysql.nakamasato.com/v1alpha1
+    kind: MySQLUser
+    metadata:
+      name: sample-user-with-grants
+    spec:
+      mysqlName: mysql-sample
+      host: '%'
+      grants:
+        - privileges: "SELECT, INSERT, UPDATE"
+          on: "sample_db.*"
+        - privileges: "SELECT"
+          on: "other_db.users"
+    ```
+
     1. Create a new MySQL user `sample-user`
 
         ```
@@ -142,7 +159,9 @@ Reduce human operations:
     sample-db   Ready   Database successfully created   {"dirty":false,"version":0}
     ```
 
-1. Grant all priviledges of the created db (`sample_db`) to the create user (`sample-user`) (TODO: Currently there's no way to manage user permissions with operator.)
+1. (Optional) Grant all privileges of the created db (`sample_db`) to the created user (`sample-user`). 
+
+    You can manage user permissions using the `grants` field in the `MySQLUser` resource as shown in the example above, or manually grant privileges:
 
     ```
     kubectl exec -it $(kubectl get po | grep mysql | head -1 | awk '{print $1}') -- mysql -uroot -ppassword

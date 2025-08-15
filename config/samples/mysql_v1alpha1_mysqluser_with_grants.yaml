@@ -1,0 +1,12 @@
+apiVersion: mysql.nakamasato.com/v1alpha1
+kind: MySQLUser
+metadata:
+  name: sample-user-with-grants
+spec:
+  mysqlName: mysql-sample
+  host: '%'
+  grants:
+    - privileges: "SELECT, INSERT, UPDATE"
+      on: "sample_db.*"
+    - privileges: "SELECT"
+      on: "other_db.users"
